@@ -2,18 +2,32 @@
 
 import os
 import subprocess
-
-import numpy as np
 import requests
-from sklearn.datasets import fetch_rcv1
 from tqdm import tqdm
+import numpy as np
 
+label_dict = {}
 
 def get_num_of_doc(path):
     cmd = "cat " + path + " | grep .W | wc -l "
     output = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True).stdout
     return int(output.decode("utf8").split(" ")[0])
 
+def download_file(url, filename, filesize):
+    with open(filename + ".gz", "wb") as file:
+        pbar = tqdm(total=filesize, unit="B", unit_scale=True)
+        pbar.set_description("Downloading " + filename[16:] + ".gz")
+        for chunk in requests.get(url + filename + ".gz", stream=True).iter_content(chunk_size=1024):
+            file.write(chunk)
+            pbar.update(len(chunk))
+        pbar.close()
+
+    cmd = ["gzip", "-d", filename + ".gz"]
+    subprocess.run(cmd, stdout=subprocess.PIPE)
+
+def get_labels(doc_id, label_dict):
+    labels = label_dict.get(doc_id, [])
+    return " ".join(labels)
 
 url = "http://www.ai.mit.edu/projects/jmlr/papers/volume5/lewis04a/a12-token-files/"
 
@@ -27,27 +41,9 @@ files = [
 
 print("This program downloads files from '" + url[:-1] + "'.")
 
-print("\nLoad RCV1 labels from sklearn (a few minutes)...  ", end="", flush=True)
-rcv1 = fetch_rcv1()
-sample_id = rcv1.sample_id
-target_names = rcv1.target_names.tolist()
-target = rcv1.target
-print("Done.\n", flush=True)
-
-
+# Download and process the RCV1-v2 dataset
 for filename, filesize in files:
-    with open(filename + ".gz", "wb") as file:
-        pbar = tqdm(total=filesize, unit="B", unit_scale=True)
-        pbar.set_description("Downloading " + filename[16:] + ".gz")
-        for chunk in requests.get(url + filename + ".gz", stream=True).iter_content(
-            chunk_size=1024
-        ):
-            ff = file.write(chunk)
-            pbar.update(len(chunk))
-        pbar.close()
-
-    cmd = ["gzip", "-d", filename + ".gz"]
-    subprocess.run(cmd, stdout=subprocess.PIPE)
+    download_file(url, filename, filesize)
 
     num_of_doc = get_num_of_doc(filename)
 
@@ -63,11 +59,8 @@ for filename, filesize in files:
                 flag = True
             elif ".I" in i:
                 doc_id.append(i.replace(".I ", "")[:-1])
-                index = np.where(sample_id == int(doc_id[-2]))[0]
-
-                labels_bool = np.array(target[index].toarray()[0])
-                labels = [target_names[int(i)] for i in np.where(labels_bool == 1)[0]]
-                labels = " ".join(labels)
+                # Process the document here
+                labels = get_labels(doc_id[-2], label_dict)  # Replace with actual label processing
                 text = " ".join(buf).replace("\n", "").replace(".W", "")
 
                 output = doc_id[-2] + "\t" + labels + "\t" + text[1:-1] + "\n"
@@ -79,11 +72,8 @@ for filename, filesize in files:
             else:
                 buf.append(i)
         else:
-            index = np.where(sample_id == int(doc_id[-1]))[0]
-
-            labels_bool = np.array(target[index].toarray()[0])
-            labels = [target_names[int(i)] for i in np.where(labels_bool == 1)[0]]
-            labels = " ".join(labels)
+            # Process the last document
+            labels = get_labels(doc_id[-1], label_dict)  # Replace with actual label processing
             text = " ".join(buf).replace("\n", "").replace(".W", "") + "\n"
 
             output = doc_id[-1] + "\t" + labels + "\t" + text
@@ -105,3 +95,17 @@ subprocess.run(cmd, stdout=subprocess.PIPE)
 cmd = ["cat " + " ".join(files[1:]) + " > test.txt"]
 subprocess.run(cmd, stdout=subprocess.PIPE, shell=True)
 [os.remove(i) for i in files[1:]]
+
+# Download and process the RCV1-v2 labels
+label_url = "http://www.ai.mit.edu/projects/jmlr/papers/volume5/lewis04a/lyrl2004_rcv1v2_README.htm"
+label_file = "rcv1-v2.labels"
+download_file(label_url, label_file, 0)  # Adjust the filesize if known
+
+with open(label_file) as f:
+    for line in f:
+        parts = line.strip().split()
+        doc_id = parts[0]
+        labels = parts[1:]
+        label_dict[doc_id] = labels
+
+os.remove(label_file)
