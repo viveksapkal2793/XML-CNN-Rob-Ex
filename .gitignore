@@ -4,6 +4,8 @@ data/valid.txt
 data/test.txt
 data/train4search.txt
 data/valid4search.txt
+data/rcv1_raw_small.p
+data/rcv1-v2.labels.gz
 
 .model_cache/best_model.pkl
 .vector_cache
