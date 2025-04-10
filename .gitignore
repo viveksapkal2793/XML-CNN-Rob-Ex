@@ -11,8 +11,10 @@ data/valid.txt.bak
 data/train.txt.bak
 data/rcv1-v2.topics.qrels
 data/lyrl2004_tokens_train.dat
-data/lyrl2004_tokens_test_pt1.dat
 data/lyrl2004_tokens_test_pt0.dat
+data/lyrl2004_tokens_test_pt1.dat
+data/lyrl2004_tokens_test_pt2.dat
+data/lyrl2004_tokens_test_pt3.dat
 
 .model_cache/best_model.pkl
 .vector_cache
