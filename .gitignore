@@ -18,6 +18,7 @@ data/lyrl2004_tokens_test_pt3.dat
 
 eurlex_data/eurlex_test.txt
 eurlex_data/eurlex_train.txt
+eurlex_data/train_org.txt
 
 results/rcv1_results.txt
 
