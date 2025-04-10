@@ -16,6 +16,8 @@ data/lyrl2004_tokens_test_pt1.dat
 data/lyrl2004_tokens_test_pt2.dat
 data/lyrl2004_tokens_test_pt3.dat
 
+results/rcv1_results.txt
+
 .model_cache/best_model.pkl
 .vector_cache
 
