@@ -1,10 +1,11 @@
 import subprocess
-
+import os
+import json
 import numpy as np
 from scipy import io as sio
 from sklearn.metrics import average_precision_score
 from tqdm import tqdm
-
+from datetime import datetime
 
 def tqdm_with_num(loader, total):
     bar = "{desc}|{bar}| [{remaining}{postfix}]"
@@ -48,3 +49,99 @@ def precision_k(true_mat, score_mat, k):
     num = np.sum(mat, axis=1)
     p = np.mean(num / k).item()
     return p
+
+def print_multiple_metrics(loader, metrics, last=False):
+    """Print multiple precision metrics on tqdm progress bar"""
+    out_str = last and "Epoch" or "Batch"
+    
+    # Format the metrics for display
+    metrics_str = f"p@1={metrics['p@1']:.6f}, p@3={metrics['p@3']:.6f}, p@5={metrics['p@5']:.6f}"
+    out_str = f" {metrics_str}/{out_str}"
+    
+    loader.set_postfix_str(out_str)
+
+
+class MetricsLogger:
+    """Logger for training and validation metrics"""
+    def __init__(self, log_dir="logs", model_name=None):
+        # Create logs directory if it doesn't exist
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # Generate model name based on timestamp if not provided
+        if model_name is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            model_name = f"model_{timestamp}"
+        
+        self.model_name = model_name
+        self.log_dir = log_dir
+        self.model_dir = os.path.join(log_dir, model_name)
+        os.makedirs(self.model_dir, exist_ok=True)
+        
+        # Initialize metrics storage
+        self.train_losses = []
+        self.valid_metrics = []
+        self.test_metrics = []
+        self.best_metrics = {}
+        
+        print(f"Logging metrics to: {self.model_dir}")
+    
+    def log_train_loss(self, epoch, batch=None, loss=None, avg_loss=None):
+        """Log training loss (batch or epoch level)"""
+        if batch is not None:
+            # Log batch-level loss
+            self.train_losses.append({
+                'epoch': epoch,
+                'batch': batch,
+                'loss': loss
+            })
+        else:
+            # Log epoch-level average loss
+            self.train_losses.append({
+                'epoch': epoch,
+                'avg_loss': avg_loss
+            })
+        
+        # Save to file periodically
+        self._save_train_logs()
+    
+    def log_validation_metrics(self, epoch, metrics):
+        """Log validation metrics for an epoch"""
+        metrics_data = {
+            'epoch': epoch,
+            **metrics
+        }
+        self.valid_metrics.append(metrics_data)
+        self._save_validation_logs()
+    
+    def log_test_metrics(self, metrics):
+        """Log test metrics after training"""
+        self.test_metrics = metrics
+        self._save_test_logs()
+    
+    def log_best_metrics(self, epoch, metrics):
+        """Log best model metrics"""
+        self.best_metrics = {
+            'epoch': epoch,
+            **metrics
+        }
+        self._save_best_logs()
+    
+    def _save_train_logs(self):
+        """Save training logs to file"""
+        with open(os.path.join(self.model_dir, 'train_losses.json'), 'w') as f:
+            json.dump(self.train_losses, f, indent=2)
+    
+    def _save_validation_logs(self):
+        """Save validation logs to file"""
+        with open(os.path.join(self.model_dir, 'validation_metrics.json'), 'w') as f:
+            json.dump(self.valid_metrics, f, indent=2)
+    
+    def _save_test_logs(self):
+        """Save test logs to file"""
+        with open(os.path.join(self.model_dir, 'test_metrics.json'), 'w') as f:
+            json.dump(self.test_metrics, f, indent=2)
+    
+    def _save_best_logs(self):
+        """Save best model metrics to file"""
+        with open(os.path.join(self.model_dir, 'best_model.json'), 'w') as f:
+            json.dump(self.best_metrics, f, indent=2)

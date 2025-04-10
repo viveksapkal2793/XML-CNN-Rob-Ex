@@ -7,7 +7,8 @@ from torch.optim.lr_scheduler import MultiStepLR
 from custom_data import XMLCNNDataset, Iterator
 # from torchtext import data
 
-from my_functions import out_size
+from my_functions import out_size, MetricsLogger
+import os
 from utils import training, validating_testing
 from xml_cnn import xml_cnn
 
@@ -218,6 +219,13 @@ class BuildProblem:
         is_ps = params["params_search"]
         term_size = shutil.get_terminal_size().columns
 
+        # Initialize logger if logging is enabled
+        logger = None
+        if params.get("enable_logging", False) and not is_ps:
+            log_dir = params.get("log_dir", "logs")
+            model_name = params.get("model_name", None)
+            logger = MetricsLogger(log_dir, model_name)
+
         # Show Hyper Params
         if trial is not None:
             sequence_length = params["sequence_length"]
@@ -241,7 +249,7 @@ class BuildProblem:
         # valid_loader = data.Iterator(
         #     self.valid,
         #     batch_size=params["batch_size"],
-        #     device=params["device"],
+            # device=params["device"],
         #     train=False,
         #     sort=False,
         # )
@@ -324,20 +332,43 @@ class BuildProblem:
             print(out_str.center(term_size, "-"))
 
             # 学習
-            training(params, model, train_loader, optimizer)
+            training(params, model, train_loader, optimizer, epoch, logger)
 
             # 検証
-            val_measure_epoch_i = validating_testing(params, model, valid_loader)
+            val_measure_epoch_i = validating_testing(params, model, valid_loader, epoch, True, logger)
 
             # 最良モデルの記録と保存
             if epoch < 2:
                 best_val_measure = val_measure_epoch_i
                 (not is_ps) and torch.save(model, save_best_model_path)
+                # Log best metrics
+                if logger is not None:
+                    if "f1" in measure:
+                        logger.log_best_metrics(epoch, {measure: best_val_measure})
+                    else:
+                        # For precision metrics - use the metrics we already have
+                        # The p@1, p@3, p@5 values are already computed in validating_testing
+                        # and logged there, so here we just log the best measure
+                        logger.log_best_metrics(epoch, {
+                            measure: best_val_measure  # Just log the primary metric
+                        })
             elif best_val_measure < val_measure_epoch_i:
                 best_epoch = epoch
                 best_val_measure = val_measure_epoch_i
                 num_of_unchanged = 1
                 (not is_ps) and torch.save(model, save_best_model_path)
+
+                # Log best metrics
+                if logger is not None:
+                    if "f1" in measure:
+                        logger.log_best_metrics(epoch, {measure: best_val_measure})
+                    else:
+                        # For precision metrics - use the metrics we already have
+                        # The p@1, p@3, p@5 values are already computed in validating_testing
+                        # and logged there, so here we just log the best measure
+                        logger.log_best_metrics(epoch, {
+                            measure: best_val_measure  # Just log the primary metric
+                        })
             else:
                 num_of_unchanged += 1
 
@@ -370,7 +401,7 @@ class BuildProblem:
             # Testing on Best Epoch Model
             model = torch.load(save_best_model_path)
             test_measure = validating_testing(
-                params, model, test_loader, is_valid=False
+                params, model, test_loader, best_epoch, is_valid=False, logger=logger
             )
             out_str = " Finished "
             print("\n\n" + out_str.center(term_size, "=") + "\n")

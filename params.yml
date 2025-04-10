@@ -14,10 +14,15 @@ params_search:
 
 common:
     batch_size: 64
-    model_cache_path: .model_cache
+    model_cache_path: .model_cache/
     measure: p@1 # micro-f1, macro-f1, p@1, p@3 or p@5
     sequence_length: 500
     vector_cache: ".vector_cache/bow_embeddings.txt"
+    # Logging configuration
+    enable_logging: true
+    log_dir: "logs"
+    # model_name is optional - will use timestamp if not provided
+    model_name: "rcv1"
 
 hyper_params:
     # These params are examples

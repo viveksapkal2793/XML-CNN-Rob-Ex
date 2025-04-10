@@ -2,7 +2,7 @@ import shutil
 import os
 import subprocess
 from argparse import ArgumentParser
-
+from datetime import datetime
 import torch
 import yaml
 
@@ -70,7 +70,7 @@ def main():
     
     # Use BOW embeddings instead of GloVe
     common["vector_cache"] = ".vector_cache/bow_embeddings.txt"
-    
+    common["model_name"] = f"eurlex_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     # Determine device
     use_device = torch.device("cuda" if torch.cuda.is_available() and not args.use_cpu else "cpu")
     
