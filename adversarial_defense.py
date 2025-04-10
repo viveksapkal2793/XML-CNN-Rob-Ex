@@ -1,0 +1,94 @@
+import torch
+
+class FGSM:
+    def __init__(self, model, epsilon=0.1):
+        """
+        Fast Gradient Sign Method for generating adversarial examples
+        Args:
+            model: The model to attack
+            epsilon: Attack strength parameter
+        """
+        self.model = model
+        self.epsilon = epsilon
+        
+    def generate(self, x, target, loss_fn=None):
+        """
+        Generate adversarial examples using FGSM
+        
+        Args:
+            x: Input tensor (token indices)
+            target: True labels
+            loss_fn: Loss function (default: BCELoss after sigmoid)
+            
+        Returns:
+            Perturbed embeddings
+        """
+        # Set model to eval mode temporarily to generate adversarial examples
+        training_mode = self.model.training
+        self.model.eval()
+        
+        # Get the word embeddings
+        emb = self.model.lookup(x)
+        emb_adv = emb.clone().detach().requires_grad_(True)
+        
+        # Forward pass on embeddings directly
+        h_non_static = emb_adv.unsqueeze(1)  # Add channel dimension
+        
+        # Process through the model layers manually
+        h_list = []
+        for i in range(len(self.model.filter_sizes)):
+            h_n = self.model.conv_layers[i](h_non_static)
+            h_n = h_n.view(h_n.shape[0], 1, h_n.shape[1] * h_n.shape[2])
+            h_n = self.model.pool_layers[i](h_n)
+            h_n = torch.relu(h_n)
+            h_n = h_n.view(h_n.shape[0], -1)
+            h_list.append(h_n)
+            
+        if len(self.model.filter_sizes) > 1:
+            h = torch.cat(h_list, 1)
+        else:
+            h = h_list[0]
+            
+        h = torch.relu(self.model.l1(h))
+        outputs = self.model.l2(h)
+        outputs = torch.sigmoid(outputs)
+        
+        # Use BCE loss if no loss function is provided
+        if loss_fn is None:
+            loss_fn = torch.nn.BCELoss()
+        
+        # Calculate loss
+        loss = loss_fn(outputs, target)
+        
+        # Backward pass to get gradients on embeddings
+        loss.backward()
+        
+        # Create adversarial examples using the sign of gradients
+        perturbed_embeddings = emb + self.epsilon * emb_adv.grad.sign()
+        
+        # Restore model's training mode
+        if training_mode:
+            self.model.train()
+        
+        return perturbed_embeddings
+
+class FeatureSqueezing:
+    def __init__(self, bit_depth=8):
+        """
+        Feature squeezing defense
+        Args:
+            bit_depth: Number of bits to use for quantization
+        """
+        self.bit_depth = bit_depth
+        self.max_val = 2 ** bit_depth - 1
+        
+    def squeeze(self, x):
+        """
+        Apply feature squeezing to tensor
+        Args:
+            x: Input tensor
+        Returns:
+            Squeezed tensor
+        """
+        x_scaled = (x * self.max_val).round() / self.max_val
+        return x_scaled

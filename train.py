@@ -46,9 +46,18 @@ def main():
     parser.add_argument("-s", "--params_search", help=message, action=action)
     message = "Use CPU."
     parser.add_argument("--use_cpu", help=message, action=action)
+    message = "Enable Adversarial Training."
+    parser.add_argument("-adv", "--adversarial_training", help=message, action=action, default=False)
+    message = "only do training."
+    parser.add_argument("-t", "--train_only", help=message, action=action, default=False)
+    message = "only do testing."
+    parser.add_argument("-te", "--test_only", help=message, action=action, default=False)
+    message = "use provided model name."
+    parser.add_argument("-m", "--model_name", help=message, type=str, default=None)
     args = parser.parse_args()
     is_ps = args.params_search
     use_cpu = args.use_cpu
+    use_adv = args.adversarial_training
     use_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_device = use_cpu and torch.device("cpu") or use_device
     term_size = shutil.get_terminal_size().columns
@@ -65,6 +74,21 @@ def main():
     hyper_params = params["hyper_params"]
     normal_train = params["normal_train"]
     params_search = params["params_search"]
+
+    if use_adv:
+        common["use_adversarial_training"] = True
+        common["epsilon"] = 0.1
+        common["bit_depth"] = 8
+        common["evaluate_adversarial"] = True
+
+    if args.model_name:
+        common["model_name"] = args.model_name
+
+    if args.train_only:
+        common["only_train"] = True
+    
+    if args.test_only:
+        common["only_test"] = True
 
     # Show Common Params
     print("\n" + " Params ".center(term_size, "-"))

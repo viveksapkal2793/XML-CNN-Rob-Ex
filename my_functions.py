@@ -85,21 +85,27 @@ class MetricsLogger:
         
         print(f"Logging metrics to: {self.model_dir}")
     
-    def log_train_loss(self, epoch, batch=None, loss=None, avg_loss=None):
+    def log_train_loss(self, epoch, batch=None, loss=None, avg_loss=None, extra_metrics=None):
         """Log training loss (batch or epoch level)"""
         if batch is not None:
             # Log batch-level loss
-            self.train_losses.append({
+            log_entry = {
                 'epoch': epoch,
                 'batch': batch,
                 'loss': loss
-            })
+            }
+            if extra_metrics:
+                log_entry.update(extra_metrics)
+            self.train_losses.append(log_entry)
         else:
             # Log epoch-level average loss
-            self.train_losses.append({
+            log_entry = {
                 'epoch': epoch,
                 'avg_loss': avg_loss
-            })
+            }
+            if extra_metrics:
+                log_entry.update(extra_metrics)
+            self.train_losses.append(log_entry)
         
         # Save to file periodically
         self._save_train_logs()

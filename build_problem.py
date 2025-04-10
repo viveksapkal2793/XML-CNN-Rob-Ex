@@ -9,9 +9,9 @@ from custom_data import XMLCNNDataset, Iterator
 
 from my_functions import out_size, MetricsLogger
 import os
-from utils import training, validating_testing
+from utils import training, validating_testing, adversarial_training, adversarial_validating_testing
 from xml_cnn import xml_cnn
-
+from adversarial_defense import FGSM
 
 # Hyper Params used in Params Search
 def get_hyper_params(trial, length):
@@ -218,6 +218,76 @@ class BuildProblem:
         params = self.params
         is_ps = params["params_search"]
         term_size = shutil.get_terminal_size().columns
+        use_adversarial = params.get("use_adversarial_training", False)
+
+        # Check for only_test mode
+        only_test = params.get("only_test", False)
+        only_train = params.get("only_train", False)
+
+        model_name = params.get("model_name", "xml_cnn")
+        if model_name is None:
+            model_name = "xml_cnn"
+        if use_adversarial:
+            model_name += "_adv"
+
+        save_best_model_path = params["model_cache_path"] + f"best_model_{model_name}.pkl"
+        
+        # If we're in test-only mode and not doing parameter search
+        if only_test and not only_train and not is_ps:
+            # Define model path
+            model_name = params.get("model_name", "xml_cnn")
+            if model_name is None:
+                model_name = "xml_cnn"
+            if use_adversarial:
+                model_name += "_adv"
+                
+            # Initialize data loaders first
+            test_loader = Iterator(
+                self.test,
+                batch_size=params["batch_size"],
+                device=params["device"],
+                train=False
+            )
+            
+            params["test_batch_total"] = math.ceil(
+                len(self.test) / params["batch_size"]
+            )
+            
+            # Initialize logger if logging is enabled
+            logger = None
+            if params.get("enable_logging", False):
+                log_dir = params.get("log_dir", "logs")
+                model_name_log = params.get("model_name", None)
+                logger = MetricsLogger(log_dir, model_name_log)
+            
+            save_best_model_path = params["model_cache_path"] + f"best_model_{model_name}.pkl"
+            print("\n" + " Test Only Mode " .center(term_size, "="))
+            
+            # Load the model
+            if os.path.exists(save_best_model_path):
+                model = torch.load(save_best_model_path)
+                
+                # Use adversarial testing if enabled
+                if params.get("evaluate_adversarial", False) and use_adversarial:
+                    test_measure = adversarial_validating_testing(
+                        params, model, test_loader, 0, is_valid=False, logger=logger
+                    )
+                else:
+                    test_measure = validating_testing(
+                        params, model, test_loader, 0, is_valid=False, logger=logger
+                    )
+                    
+                out_str = " Finished Testing "
+                print("\n\n" + out_str.center(term_size, "=") + "\n")
+                
+                # Return a dummy value since we're not doing parameter search
+                return 0
+            else:
+                print(f"\nError: Model file {save_best_model_path} not found!")
+                return 0
+        
+        # Initialize FGSM attack
+        # fgsm = FGSM(self.model, epsilon=0.1)  # You can make epsilon a parameter
 
         # Initialize logger if logging is enabled
         logger = None
@@ -318,9 +388,16 @@ class BuildProblem:
 
         measure = params["measure"]
         measure = "f1" in measure and measure[:-3] or measure
+
+        model_name = params["model_name"]
+        if model_name is None:
+            model_name = "xml_cnn"
+        if use_adversarial:
+            model_name += "_adv"
+
         if not is_ps:
-            save_best_model_path = params["model_cache_path"] + "best_model.pkl"
-        # 学習
+            save_best_model_path = params["model_cache_path"] + f"best_model_{model_name}.pkl"
+        
         for epoch in range(1, epochs + 1):
             if self.params["params_search"]:
                 out_str = " Epoch: {} ".format(epoch)
@@ -331,13 +408,21 @@ class BuildProblem:
             # out_str = " Epoch: {} ".format(epoch)
             print(out_str.center(term_size, "-"))
 
-            # 学習
-            training(params, model, train_loader, optimizer, epoch, logger)
+            
+            # Use adversarial training if enabled
+            if use_adversarial:
+                adversarial_training(params, model, train_loader, optimizer, epoch, logger)
+            else:
+                training(params, model, train_loader, optimizer, epoch, logger)
 
-            # 検証
-            val_measure_epoch_i = validating_testing(params, model, valid_loader, epoch, True, logger)
+           
+            # Validation
+            if params.get("evaluate_adversarial", False) and use_adversarial:
+                val_measure_epoch_i = adversarial_validating_testing(params, model, valid_loader, epoch, True, logger)
+            else:
+                val_measure_epoch_i = validating_testing(params, model, valid_loader, epoch, True, logger)
 
-            # 最良モデルの記録と保存
+            
             if epoch < 2:
                 best_val_measure = val_measure_epoch_i
                 (not is_ps) and torch.save(model, save_best_model_path)
@@ -398,16 +483,31 @@ class BuildProblem:
             out_str = out_str.format(self.num_of_trial, self.best_trial_measure)
             print(out_str.center(term_size, "="))
         else:
-            # Testing on Best Epoch Model
-            model = torch.load(save_best_model_path)
-            test_measure = validating_testing(
-                params, model, test_loader, best_epoch, is_valid=False, logger=logger
-            )
-            out_str = " Finished "
-            print("\n\n" + out_str.center(term_size, "=") + "\n")
+            # Only proceed with testing if we're not in "only_train" mode
+            # or if both flags are set (which means do everything)
+            only_train = params.get("only_train", False)
+            only_test = params.get("only_test", False)
 
-            out_str = " Best Epoch: {} (" + measure + ": {:.20f}) "
-            out_str = out_str.format(best_epoch, test_measure)
-            print("\n" + out_str.center(term_size, "-") + "\n")
+            # Testing on Best Epoch Model
+            if not only_train or (only_train and only_test) or (not(only_test and only_train)):
+                # Testing on Best Epoch Model
+                model = torch.load(save_best_model_path)
+                
+                # Use adversarial testing if enabled, just like in validation
+                if params.get("evaluate_adversarial", False) and use_adversarial:
+                    test_measure = adversarial_validating_testing(
+                        params, model, test_loader, best_epoch, is_valid=False, logger=logger
+                    )
+                else:
+                    test_measure = validating_testing(
+                        params, model, test_loader, best_epoch, is_valid=False, logger=logger
+                    )
+                    
+                out_str = " Finished "
+                print("\n\n" + out_str.center(term_size, "=") + "\n")
+
+                out_str = " Best Epoch: {} (" + measure + ": {:.20f}) "
+                out_str = out_str.format(best_epoch, test_measure)
+                print("\n" + out_str.center(term_size, "-") + "\n")
 
         return 1 - best_val_measure

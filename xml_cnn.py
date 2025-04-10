@@ -3,7 +3,7 @@ from torch import nn as nn
 from torch.nn import functional as F
 
 from my_functions import out_size
-
+from adversarial_defense import FeatureSqueezing
 
 class xml_cnn(nn.Module):
     def __init__(self, params, embedding_weights):
@@ -18,6 +18,9 @@ class xml_cnn(nn.Module):
         filter_channels = params["filter_channels"]
         d_max_pool_p = params["d_max_pool_p"]
         self.filter_sizes = params["filter_sizes"]
+
+        # Initialize feature squeezing for inference
+        self.feature_squeezing = FeatureSqueezing(bit_depth=params.get("bit_depth", 8))
 
         self.lookup = nn.Embedding.from_pretrained(embedding_weights, freeze=False)
 
@@ -54,7 +57,7 @@ class xml_cnn(nn.Module):
         torch.nn.init.kaiming_normal_(self.l1.weight)
         torch.nn.init.kaiming_normal_(self.l2.weight)
 
-    def forward(self, x):
+    def forward(self, x, apply_squeezing=False):
         # Embedding layer
         h_non_static = self.lookup.forward(x)  # Remove permute to handle batch correctly
         h_non_static = h_non_static.unsqueeze(1)  # Add channel dimension (batch, 1, seq_len, emb_dim)
@@ -83,6 +86,16 @@ class xml_cnn(nn.Module):
         h = F.relu(self.l1(h))
         h = self.dropout_1(h)
 
+        # Apply feature squeezing at inference time if requested
+        if apply_squeezing:
+            y = self.feature_squeezing.squeeze(y)
+
         # Output layer
         y = self.l2(h)
         return y
+    
+    def predict(self, x):
+        """Inference method with feature squeezing defense"""
+        self.eval()
+        with torch.no_grad():
+            return self.forward(x, apply_squeezing=True)
