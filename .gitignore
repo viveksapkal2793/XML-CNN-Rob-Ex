@@ -26,6 +26,7 @@ eurlex_data/train.txt
 results/rcv1_results.txt
 results/eurlex_results.txt
 
+.model_cache/
 .model_cache/best_model.pkl
 .model_cache/best_model_eurlex.pkl
 .vector_cache
