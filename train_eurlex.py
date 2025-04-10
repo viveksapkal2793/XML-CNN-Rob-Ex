@@ -13,8 +13,8 @@ def setup_eurlex_dataset():
     """Set up the Eurlex dataset for XML-CNN"""
     
     # Step 1: Check if data files exist, download if not
-    eurlex_train = "data/eurlex_train.txt"
-    eurlex_test = "data/eurlex_test.txt"
+    eurlex_train = "eurlex_data/eurlex_train.txt"
+    eurlex_test = "eurlex_data/eurlex_test.txt"
     
     if not os.path.exists(eurlex_train) or not os.path.exists(eurlex_test):
         print("Eurlex dataset files not found. Please place them in data/ directory.")
@@ -24,34 +24,36 @@ def setup_eurlex_dataset():
     # Step 2: Convert Eurlex format to XML-CNN format
     print("Converting Eurlex format to XML-CNN compatible format...")
     subprocess.call([
-        "python", "data/convert_eurlex.py", 
-        eurlex_train, "data/train_org.txt"
+        "python", "eurlex_data/convert_eurlex.py", 
+        eurlex_train, "eurlex_data/train_org.txt"
     ])
     
     subprocess.call([
-        "python", "data/convert_eurlex.py", 
-        eurlex_test, "data/test.txt"
+        "python", "eurlex_data/convert_eurlex.py", 
+        eurlex_test, "eurlex_data/test.txt"
     ])
     
     # Step 3: Create validation set
     print("Creating validation set...")
-    subprocess.call(["python", "data/make_valid.py", "data/train_org.txt"])
+    subprocess.call(["python", "eurlex_data/make_valid.py", "eurlex_data/train_org.txt"])
     
     # Step 4: Create BOW embeddings
     print("Creating BOW embeddings...")
-    subprocess.call(["python", "data/create_bow_embeddings.py", "--dim", "5000"])
+    subprocess.call(["python", "eurlex_data/create_bow_embeddings.py", "--dim", "5000", "--emb-dim", "300"])
     
     return True
 
 def main():
     parser = ArgumentParser()
     parser.add_argument("--use_cpu", help="Use CPU instead of GPU", action="store_true")
+    parser.add_argument("--no_preproc", help="if preprocessing is done", action="store_true")
     args = parser.parse_args()
     
     # Setup Eurlex dataset
-    if not setup_eurlex_dataset():
-        print("Failed to set up Eurlex dataset. Exiting.")
-        return
+    if not args.no_preproc:
+        if not setup_eurlex_dataset():
+            print("Failed to set up Eurlex dataset. Exiting.")
+            return
     
     # Load parameters from config
     with open("params.yml") as f:
@@ -62,9 +64,9 @@ def main():
     normal_train = params["normal_train"]
     
     # Update parameters for Eurlex
-    common["train_data_path"] = "data/train.txt"
-    common["valid_data_path"] = "data/valid.txt"
-    common["test_data_path"] = "data/test.txt"
+    normal_train["train_data_path"] = "eurlex_data/train.txt"
+    normal_train["valid_data_path"] = "eurlex_data/valid.txt"
+    normal_train["test_data_path"] = "eurlex_data/test.txt"
     
     # Use BOW embeddings instead of GloVe
     common["vector_cache"] = ".vector_cache/bow_embeddings.txt"

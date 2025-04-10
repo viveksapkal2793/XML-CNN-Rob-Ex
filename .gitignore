@@ -20,10 +20,14 @@ eurlex_data/eurlex_test.txt
 eurlex_data/eurlex_train.txt
 eurlex_data/train_org.txt
 eurlex_data/test.txt
+eurlex_data/valid.txt
+eurlex_data/train.txt
 
 results/rcv1_results.txt
+results/eurlex_results.txt
 
 .model_cache/best_model.pkl
+.model_cache/eurlex_model_best.pkl
 .vector_cache
 
 # Byte-compiled / optimized / DLL files
