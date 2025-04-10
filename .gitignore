@@ -27,7 +27,7 @@ results/rcv1_results.txt
 results/eurlex_results.txt
 
 .model_cache/best_model.pkl
-.model_cache/eurlex_model_best.pkl
+.model_cache/best_model_eurlex.pkl
 .vector_cache
 
 # Byte-compiled / optimized / DLL files

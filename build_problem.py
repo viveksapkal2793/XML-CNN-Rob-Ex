@@ -191,8 +191,11 @@ class BuildProblem:
             self.test = test_dataset
         
         # Load GloVe vectors
-        embeddings = train_dataset.load_vectors('.vector_cache/glove.6B.300d.txt')
+        # embeddings = train_dataset.load_vectors('.vector_cache/glove.6B.300d.txt')
         
+        vector_path = self.params.get("vector_cache", ".vector_cache/glove.6B.300d.txt")
+        embeddings = train_dataset.load_vectors(vector_path)
+
         # Store vocabulary and embeddings in TEXT attribute
         class DummyText:
             def __init__(self):

@@ -74,8 +74,12 @@ class XMLCNNDataset(Dataset):
         }
     
     def load_vectors(self, vector_file, dim=300):
-        """Load pre-trained word vectors"""
+        """Load pre-trained word vectors - supports both GloVe and BOW embeddings"""
         print(f"Loading word vectors from {vector_file}...")
+        
+        # Auto-detect if we're using BOW features
+        is_bow = 'bow_embeddings.txt' in vector_file
+        
         vectors = {}
         with open(vector_file, 'r', encoding='utf-8') as f:
             for line in f:
@@ -92,6 +96,12 @@ class XMLCNNDataset(Dataset):
         for word, idx in self.vocab.items():
             if word in vectors:
                 embedding_matrix[idx] = vectors[word]
+            # Special handling for feature tokens in BOW mode
+            elif is_bow and word.startswith('f') and word[1:].isdigit():
+                feature_id = int(word[1:])
+                feature_token = f"f{feature_id}"
+                if feature_token in vectors:
+                    embedding_matrix[idx] = vectors[feature_token]
         
         return torch.FloatTensor(embedding_matrix)
 

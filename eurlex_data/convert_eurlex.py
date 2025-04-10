@@ -8,7 +8,7 @@ def convert_eurlex_to_text_format(input_file, output_file, feature_dim=5000, seq
     Convert Eurlex-4k BOW format to a sequence format compatible with XML-CNN
     
     Input format: "446,521,1149,1249 0:0.084556 1:0.138594 2:0.094304..."
-    Output format: "446,521,1149,1249\tfeature1 feature2 feature3..."
+    Output format: "doc123\t446 521 1149 1249\tfeature1 feature2 feature3..."
     
     The idea is to convert sparse features to a "pseudo-text" sequence
     where feature IDs with highest values become tokens in the sequence.
@@ -21,12 +21,21 @@ def convert_eurlex_to_text_format(input_file, output_file, feature_dim=5000, seq
         first_line = f_in.readline().strip()
         print(f"Skipping metadata line: {first_line}")
         
+        # Counter for document IDs
+        doc_counter = 0
+        
         for line in tqdm(f_in):
             parts = line.strip().split(' ', 1)
             if len(parts) != 2:
                 continue
-                
-            labels, features_str = parts
+            
+            # Generate document ID    
+            doc_id = f"{doc_counter}"
+            doc_counter += 1
+            
+            # Get labels and convert from comma-separated to space-separated
+            labels_comma, features_str = parts
+            labels_space = ' '.join(labels_comma.split(','))
             
             # Parse features (sparse format)
             features = {}
@@ -48,10 +57,11 @@ def convert_eurlex_to_text_format(input_file, output_file, feature_dim=5000, seq
                 token_seq += padding
             
             # Write in the format expected by XML-CNN: ID\tLABELS\tTEXT
-            # Using the document index as ID
-            f_out.write(f"{labels}\t{token_seq}\n")
+            # Format: doc_id\tlabels\tfeatures
+            f_out.write(f"{doc_id}\t{labels_space}\t{token_seq}\n")
     
     print(f"Conversion complete. Output saved to {output_file}")
+    print(f"Processed {doc_counter} documents.")
 
 def main():
     parser = argparse.ArgumentParser(description="Convert Eurlex-4k BOW format to XML-CNN compatible format")
