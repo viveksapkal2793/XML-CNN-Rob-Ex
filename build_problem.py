@@ -4,7 +4,8 @@ import shutil
 import torch
 from torch import optim
 from torch.optim.lr_scheduler import MultiStepLR
-from torchtext import data
+from custom_data import XMLCNNDataset, Iterator
+# from torchtext import data
 
 from my_functions import out_size
 from utils import training, validating_testing
@@ -108,51 +109,106 @@ class BuildProblem:
     def preprocess(self):
         print("\nLoading data...  ", end="", flush=True)
 
-        process = MakeLabelVector()
-        set_label_vector = process.set_label_vector
-        get_label_vector = process.get_label_vector
+        # ------------torchtext implementation (compatibility issues)------------
+        # process = MakeLabelVector()
+        # set_label_vector = process.set_label_vector
+        # get_label_vector = process.get_label_vector
 
-        # Define fields for torchtext
-        length = self.params["sequence_length"]
-        self.ID = data.RawField(is_target=False)
-        self.LABEL = data.RawField(set_label_vector, get_label_vector, True)
-        self.TEXT = data.Field(sequential=True, lower=True, fix_length=length)
+        # # Define fields for torchtext
+        # length = self.params["sequence_length"]
+        # self.ID = data.RawField(is_target=False)
+        # self.LABEL = data.RawField(set_label_vector, get_label_vector, True)
+        # self.TEXT = data.Field(sequential=True, lower=True, fix_length=length)
 
-        fields = [
-            ("id", self.ID),
-            ("label", self.LABEL),
-            ("text", self.TEXT),
-        ]
+        # fields = [
+        #     ("id", self.ID),
+        #     ("label", self.LABEL),
+        #     ("text", self.TEXT),
+        # ]
 
-        datasets = data.TabularDataset.splits(
-            path="./",
-            train=self.params["train_data_path"],
-            validation=self.params["valid_data_path"],
-            test=self.params["test_data_path"],
-            format="tsv",
-            fields=fields,
+        # datasets = data.TabularDataset.splits(
+        #     path="./",
+        #     train=self.params["train_data_path"],
+        #     validation=self.params["valid_data_path"],
+        #     test=self.params["test_data_path"],
+        #     format="tsv",
+        #     fields=fields,
+        # )
+
+        # if self.params["params_search"]:
+        #     self.train, self.valid = datasets
+        # else:
+        #     self.train, self.valid, self.test = datasets
+
+        # print("Done.", flush=True)
+
+        # # Convert words to ID
+        # print("Converting text to ID...  ", end="", flush=True)
+        # if self.params["params_search"]:
+        #     self.TEXT.build_vocab(self.train, self.valid)
+        # else:
+        #     self.TEXT.build_vocab(self.train, self.valid, self.test)
+
+        # self.TEXT.vocab.load_vectors("glove.6B.300d")
+        # print("Done.\n", flush=True)
+
+        # # Add parameters that havn't yet been defined
+        # self.params["uniq_of_cat"] = process.uniq_of_cat
+        # self.params["num_of_class"] = len(process.uniq_of_cat)
+
+        ## -----------------custom dataloader implementaion ------------
+
+        # Load datasets
+        train_dataset = XMLCNNDataset(
+            self.params["train_data_path"],
+            max_length=self.params["sequence_length"]
         )
-
-        if self.params["params_search"]:
-            self.train, self.valid = datasets
-        else:
-            self.train, self.valid, self.test = datasets
-
+        
+        # Now load validation and test with the same label structure
+        valid_dataset = XMLCNNDataset(
+            self.params["valid_data_path"],
+            vocab=train_dataset.vocab,
+            build_vocab=False,
+            max_length=self.params["sequence_length"],
+            label_list=train_dataset.label_list,
+            label_to_idx=train_dataset.label_to_idx
+        )
+        
+        if not self.params["params_search"]:
+            test_dataset = XMLCNNDataset(
+                self.params["test_data_path"],
+                vocab=train_dataset.vocab,
+                build_vocab=False,
+                max_length=self.params["sequence_length"],
+                label_list=train_dataset.label_list,
+                label_to_idx=train_dataset.label_to_idx
+            )
+        
+        # Store datasets
+        self.train = train_dataset
+        self.valid = valid_dataset
+        if not self.params["params_search"]:
+            self.test = test_dataset
+        
+        # Load GloVe vectors
+        embeddings = train_dataset.load_vectors('.vector_cache/glove.6B.300d.txt')
+        
+        # Store vocabulary and embeddings in TEXT attribute
+        class DummyText:
+            def __init__(self):
+                self.vocab = DummyVocab()
+                
+        class DummyVocab:
+            def __init__(self):
+                self.vectors = embeddings
+                
+        self.TEXT = DummyText()
+        
+        # Store label information
+        self.params["uniq_of_cat"] = train_dataset.label_list
+        self.params["num_of_class"] = len(train_dataset.label_list)
+        
         print("Done.", flush=True)
-
-        # Convert words to ID
-        print("Converting text to ID...  ", end="", flush=True)
-        if self.params["params_search"]:
-            self.TEXT.build_vocab(self.train, self.valid)
-        else:
-            self.TEXT.build_vocab(self.train, self.valid, self.test)
-
-        self.TEXT.vocab.load_vectors("glove.6B.300d")
-        print("Done.\n", flush=True)
-
-        # Add parameters that havn't yet been defined
-        self.params["uniq_of_cat"] = process.uniq_of_cat
-        self.params["num_of_class"] = len(process.uniq_of_cat)
 
     def run(self, trial=None):
         params = self.params
@@ -171,29 +227,52 @@ class BuildProblem:
             print([i for i in sorted(hyper_params.items())])
             print("-" * shutil.get_terminal_size().columns + "\n")
 
-        # Generate Batch Iterators
-        train_loader = data.Iterator(
+        # Generate Batch Iterators (torchtext iterator)
+        # train_loader = data.Iterator(
+        #     self.train,
+        #     batch_size=params["batch_size"],
+        #     device=params["device"],
+        #     train=True,
+        # )
+
+        # valid_loader = data.Iterator(
+        #     self.valid,
+        #     batch_size=params["batch_size"],
+        #     device=params["device"],
+        #     train=False,
+        #     sort=False,
+        # )
+
+        # if not is_ps:
+        #     test_loader = data.Iterator(
+        #         self.test,
+        #         batch_size=params["batch_size"],
+        #         device=params["device"],
+        #         train=False,
+        #         sort=False,
+        #     )
+
+        # Generate Batch Iterators (custom iterator)
+        train_loader = Iterator(
             self.train,
             batch_size=params["batch_size"],
             device=params["device"],
-            train=True,
+            train=True
         )
 
-        valid_loader = data.Iterator(
+        valid_loader = Iterator(
             self.valid,
             batch_size=params["batch_size"],
             device=params["device"],
-            train=False,
-            sort=False,
+            train=False
         )
 
         if not is_ps:
-            test_loader = data.Iterator(
+            test_loader = Iterator(
                 self.test,
                 batch_size=params["batch_size"],
                 device=params["device"],
-                train=False,
-                sort=False,
+                train=False
             )
 
         # Calc Batch Size

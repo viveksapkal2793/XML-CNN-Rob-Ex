@@ -23,7 +23,7 @@ class xml_cnn(nn.Module):
 
         self.conv_layers = nn.ModuleList()
         self.pool_layers = nn.ModuleList()
-        fin_l_out_size = 0
+        self.fin_l_out_size = 0
 
         self.dropout_0 = nn.Dropout(0.5)
         self.dropout_1 = nn.Dropout(0.5)
@@ -41,12 +41,13 @@ class xml_cnn(nn.Module):
             pool_k_size = conv_out_size // n
             pool_n = nn.MaxPool1d(pool_k_size, stride=pool_k_size)
 
-            fin_l_out_size += n
+            self.fin_l_out_size += n
 
             self.conv_layers.append(conv_n)
             self.pool_layers.append(pool_n)
-
-        self.l1 = nn.Linear(fin_l_out_size, params["hidden_dims"])
+        
+        # Create linear layers after calculating correct dimensions
+        self.l1 = nn.Linear(self.fin_l_out_size, hidden_dims)
         self.l2 = nn.Linear(hidden_dims, params["num_of_class"])
 
         # Initialize with He's method
@@ -55,10 +56,8 @@ class xml_cnn(nn.Module):
 
     def forward(self, x):
         # Embedding layer
-        h_non_static = self.lookup.forward(x.permute(1, 0))
-        h_non_static = h_non_static.reshape(
-            h_non_static.shape[0], 1, h_non_static.shape[1], h_non_static.shape[2]
-        )
+        h_non_static = self.lookup.forward(x)  # Remove permute to handle batch correctly
+        h_non_static = h_non_static.unsqueeze(1)  # Add channel dimension (batch, 1, seq_len, emb_dim)
         h_non_static = self.dropout_0(h_non_static)
 
         h_list = []
@@ -71,13 +70,15 @@ class xml_cnn(nn.Module):
             h_n = F.relu(h_n)
             h_n = h_n.view(h_n.shape[0], -1)
             h_list.append(h_n)
-            del h_n
 
         if len(self.filter_sizes) > 1:
             h = torch.cat(h_list, 1)
         else:
             h = h_list[0]
-
+        
+        # Ensure dimensions match what's expected
+        assert h.shape[1] == self.fin_l_out_size, f"Expected features: {self.fin_l_out_size}, got: {h.shape[1]}"
+        
         # Full connected layer
         h = F.relu(self.l1(h))
         h = self.dropout_1(h)

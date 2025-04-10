@@ -4,7 +4,7 @@ from torch.utils.data import Dataset, DataLoader
 import os
 
 class XMLCNNDataset(Dataset):
-    def __init__(self, file_path, vocab=None, build_vocab=True, max_length=500):
+    def __init__(self, file_path, vocab=None, build_vocab=True, max_length=500, label_list=None, label_to_idx=None):
         self.ids = []
         self.texts = []
         self.labels = []
@@ -23,9 +23,13 @@ class XMLCNNDataset(Dataset):
                     self.texts.append(text.split())
                     self.label_set.update(label_str.split())
         
-        # Create label mapping
-        self.label_list = sorted(list(self.label_set))
-        self.label_to_idx = {label: i for i, label in enumerate(self.label_list)}
+        # Create label mapping - use provided label list if given
+        if label_list is not None:
+            self.label_list = label_list
+            self.label_to_idx = label_to_idx
+        else:
+            self.label_list = sorted(list(self.label_set))
+            self.label_to_idx = {label: i for i, label in enumerate(self.label_list)}
         
         # Build vocabulary
         if build_vocab:
@@ -55,7 +59,11 @@ class XMLCNNDataset(Dataset):
             indices = indices[:self.max_length]
         
         # Convert labels to one-hot vector
-        label_indices = [self.label_to_idx[label] for label in self.labels[idx]]
+        label_indices = []
+        for label in self.labels[idx]:
+            if label in self.label_to_idx:  # Only use labels that are in our mapping
+                label_indices.append(self.label_to_idx[label])
+        
         label_vector = np.zeros(len(self.label_list))
         label_vector[label_indices] = 1
         
