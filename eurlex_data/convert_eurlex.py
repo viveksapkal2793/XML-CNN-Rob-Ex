@@ -16,6 +16,11 @@ def convert_eurlex_to_text_format(input_file, output_file, feature_dim=5000, seq
     print(f"Converting {input_file} to {output_file}...")
     
     with open(input_file, 'r') as f_in, open(output_file, 'w') as f_out:
+
+        # Skip the first line with metadata
+        first_line = f_in.readline().strip()
+        print(f"Skipping metadata line: {first_line}")
+        
         for line in tqdm(f_in):
             parts = line.strip().split(' ', 1)
             if len(parts) != 2:
