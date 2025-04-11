@@ -79,7 +79,6 @@ def main():
 
     if use_adv:
         common["use_adversarial_training"] = True
-        common["epsilon"] = 0.1
         common["bit_depth"] = 8
         common["evaluate_adversarial"] = True
 
@@ -94,8 +93,15 @@ def main():
 
     if args.model_name == "rcv1":
         common["vector_cache"] = ".vector_cache/glove.6B.300d.txt"
+        common["epsilon"] = 0.1 
     if args.model_name == "eurlex":
         common["vector_cache"] = ".vector_cache/bow_embeddings.txt"
+        common["epsilon"] = 0.01
+
+    if args.model_name == "eurlex":
+        normal_train["train_data_path"] = "eurlex_data/train.txt"
+        normal_train["test_data_path"] = "eurlex_data/test.txt"
+        normal_train["valid_data_path"] = "eurlex_data/valid.txt"
         
     # Show Common Params
     print("\n" + " Params ".center(term_size, "-"))

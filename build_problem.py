@@ -489,7 +489,7 @@ class BuildProblem:
             only_test = params.get("only_test", False)
 
             # Testing on Best Epoch Model
-            if not only_train or (only_train and only_test) or (not(only_test and only_train)):
+            if not only_train or only_test:
                 # Testing on Best Epoch Model
                 model = torch.load(save_best_model_path)
                 
