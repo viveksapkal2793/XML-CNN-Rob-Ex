@@ -1,7 +1,7 @@
 normal_train:
-    train_data_path: data/train.txt
-    valid_data_path: data/valid.txt
-    test_data_path: data/test.txt
+    train_data_path: eurlex_data/train.txt
+    valid_data_path: eurlex_data/valid.txt
+    test_data_path: eurlex_data/test.txt
     epochs: 50
     early_stopping: 5 # == 0 or False: Disable, > 0: Trigger
 
@@ -17,7 +17,8 @@ common:
     model_cache_path: .model_cache/
     measure: p@1 # micro-f1, macro-f1, p@1, p@3 or p@5
     sequence_length: 500
-    vector_cache: ".vector_cache/bow_embeddings.txt"
+    vector_cache: ".vector_cache/glove.6B.300d.txt"
+    # vector_cache: ".vector_cache/bow_embeddings.txt"
     # Execution control flags
     only_train: False
     only_test: False

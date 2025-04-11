@@ -7,6 +7,8 @@ import yaml
 
 from build_problem import BuildProblem
 from my_functions import out_size
+torch.cuda.empty_cache()
+torch.backends.cudnn.benchmark = False
 
 # Convert params from Optuna
 def convert_params(params, length):
@@ -90,6 +92,11 @@ def main():
     if args.test_only:
         common["only_test"] = True
 
+    if args.model_name == "rcv1":
+        common["vector_cache"] = ".vector_cache/glove.6B.300d.txt"
+    if args.model_name == "eurlex":
+        common["vector_cache"] = ".vector_cache/bow_embeddings.txt"
+        
     # Show Common Params
     print("\n" + " Params ".center(term_size, "-"))
     print([i for i in sorted(common.items())])
