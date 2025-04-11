@@ -72,6 +72,7 @@ class MetricsLogger:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             model_name = f"model_{timestamp}"
         
+        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.model_name = model_name
         self.log_dir = log_dir
         self.model_dir = os.path.join(log_dir, model_name)
@@ -108,7 +109,7 @@ class MetricsLogger:
             self.train_losses.append(log_entry)
         
         # Save to file periodically
-        self._save_train_logs()
+        self._save_train_logs(self.model_name, self.timestamp)
     
     def log_validation_metrics(self, epoch, metrics):
         """Log validation metrics for an epoch"""
@@ -117,12 +118,12 @@ class MetricsLogger:
             **metrics
         }
         self.valid_metrics.append(metrics_data)
-        self._save_validation_logs()
+        self._save_validation_logs(self.model_name, self.timestamp)
     
     def log_test_metrics(self, metrics):
         """Log test metrics after training"""
         self.test_metrics = metrics
-        self._save_test_logs()
+        self._save_test_logs(self.model_name, self.timestamp)
     
     def log_best_metrics(self, epoch, metrics):
         """Log best model metrics"""
@@ -130,24 +131,24 @@ class MetricsLogger:
             'epoch': epoch,
             **metrics
         }
-        self._save_best_logs()
+        self._save_best_logs(self.model_name, self.timestamp)
     
-    def _save_train_logs(self):
+    def _save_train_logs(self, model_name, timestamp):
         """Save training logs to file"""
-        with open(os.path.join(self.model_dir, 'train_losses.json'), 'w') as f:
+        with open(os.path.join(self.model_dir, f'{model_name}_train_losses_{timestamp}.json'), 'w') as f:
             json.dump(self.train_losses, f, indent=2)
     
-    def _save_validation_logs(self):
+    def _save_validation_logs(self, model_name, timestamp):
         """Save validation logs to file"""
-        with open(os.path.join(self.model_dir, 'validation_metrics.json'), 'w') as f:
+        with open(os.path.join(self.model_dir, f'{model_name}_validation_metrics_{timestamp}.json'), 'w') as f:
             json.dump(self.valid_metrics, f, indent=2)
     
-    def _save_test_logs(self):
+    def _save_test_logs(self, model_name, timestamp):
         """Save test logs to file"""
-        with open(os.path.join(self.model_dir, 'test_metrics.json'), 'w') as f:
+        with open(os.path.join(self.model_dir, f'{model_name}_test_metrics-{timestamp}.json'), 'w') as f:
             json.dump(self.test_metrics, f, indent=2)
     
-    def _save_best_logs(self):
+    def _save_best_logs(self, model_name, timestamp):
         """Save best model metrics to file"""
-        with open(os.path.join(self.model_dir, 'best_model.json'), 'w') as f:
+        with open(os.path.join(self.model_dir, f'best_model_{model_name}_{timestamp}.json'), 'w') as f:
             json.dump(self.best_metrics, f, indent=2)

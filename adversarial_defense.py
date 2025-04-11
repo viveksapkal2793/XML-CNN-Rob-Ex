@@ -29,6 +29,10 @@ class FGSM:
         
         # Get the word embeddings
         emb = self.model.lookup(x)
+        # Calculate average embedding norm for this batch
+        avg_norm = torch.mean(torch.norm(emb, dim=-1))
+        adaptive_epsilon = self.epsilon * (avg_norm / 10.0)  # Scale epsilon by norm
+
         emb_adv = emb.clone().detach().requires_grad_(True)
         
         # Forward pass on embeddings directly
@@ -64,7 +68,7 @@ class FGSM:
         loss.backward()
         
         # Create adversarial examples using the sign of gradients
-        perturbed_embeddings = emb + self.epsilon * emb_adv.grad.sign()
+        perturbed_embeddings = emb + adaptive_epsilon * emb_adv.grad.sign()
         
         # Restore model's training mode
         if training_mode:

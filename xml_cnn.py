@@ -85,13 +85,13 @@ class xml_cnn(nn.Module):
         # Full connected layer
         h = F.relu(self.l1(h))
         h = self.dropout_1(h)
-
+        
+        # Output layer
+        y = self.l2(h)
         # Apply feature squeezing at inference time if requested
         if apply_squeezing:
             y = self.feature_squeezing.squeeze(y)
 
-        # Output layer
-        y = self.l2(h)
         return y
     
     def predict(self, x):
