@@ -2,13 +2,17 @@
 
 Implementation and enhancement of XML-CNN with respect to explainability and robustness of [Deep Learning for Extreme Multi-label Text Classification](http://nyc.lti.cs.cmu.edu/yiming/Publications/jliu-sigir17.pdf) using PyTorch.
 
+Find the poster explanation video [here](https://drive.google.com/file/d/1y-tkqNtbWfCRvnc00jSRwmS2HJbVdQfd/view)
+
 > Liu, J., Chang, W.-C., Wu, Y. and Yang, Y.: Deep learning fo extreme multi-label text classification, in Proc. of the 40th International ACM SIGIR Conference on Research and Development in Information Retrieval, pp. 115-124 (2017).
 
 # Requirements
 - Python: 3.6.10 or higher
 - PyTorch: 1.6.0 or higher
-- torchtext: 0.6.0 or higher
 - Optuna: 2.0.0 or higher
+- transformers
+- lime
+- shap
 
 You can create a virtual environment of Anaconda from requirements.yml.  
 We can't guarantee the operation of Anaconda environment other than the one created with requirements.yml.
@@ -68,7 +72,7 @@ The p shown in that paper becomes the `d_max_pool_p` in params.yml.
 As in the paper, `d_max_pool_p` must be a divisible number for the output vector after convolution.
 
 # Evaluation Metrics
-Precision@K and F1-Score are available for this program.  
+Precision@K is available for this project.  
 You can change it from params.yml.
 
 # How to run
@@ -116,11 +120,11 @@ eurlex_data
 ```
 
 ### Pre-trained Models
-Pre-trained base and robust models trained on RCV1 and Eurlex-4K datasets can be downloaded from [this link](https://drive.google.com/file/d/1bFFrAcyO6aBYujJOUBDMbXp7M2STS0kp/view).
+Pre-trained base and robust models trained on RCV1 and Eurlex-4K datasets can be downloaded from [here](https://drive.google.com/file/d/1bFFrAcyO6aBYujJOUBDMbXp7M2STS0kp/view).
 
 Extract the zip file to create the .model_cache directory:
 ```
-$ unzip models.zip
+$ unzip XML-CNN-pre-trained-models.zip
 ```
 
 ## Training and Testing Options
@@ -152,6 +156,8 @@ $ python train.py -m model_name -te
 $ python train.py -m model_name -te -adv
 ```
 
+- **Running train.py will also run LIME and SHAP explanability on the trained model and save the results to the respective directory. Comment out specific lines in train.py to only run the explainability runs or only train or only test.**
+
 ## Params Search
 ```
 $ python train.py --params_search
@@ -166,11 +172,15 @@ $ python train.py -s
 $ python train.py --use_cpu
 ```
 
+# Contributors:
+
+- [Vivek Sapkal](viveksapkal2003@gmail.com)
+- [Preet Savalia](b22ai036@iitj.ac.in)
+
 # Acknowledgment
-This program is based on the following repositories.
+
+This project is based on the following repositories.
 Thank you very much for their accomplishments.
 
 - [siddsax/XML-CNN](https://github.com/siddsax/XML-CNN) (MIT License)
 - [PaulAlbert31/LabelNoiseCorrection](https://github.com/PaulAlbert31/LabelNoiseCorrection) (MIT License)
-
-Similar code found with 2 license types

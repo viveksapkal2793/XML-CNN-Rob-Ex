@@ -59,6 +59,7 @@ class xml_cnn(nn.Module):
 
     def forward(self, x, apply_squeezing=False):
         # Embedding layer
+        x = x.to(self.lookup.weight.device) 
         h_non_static = self.lookup.forward(x)  # Remove permute to handle batch correctly
         h_non_static = h_non_static.unsqueeze(1)  # Add channel dimension (batch, 1, seq_len, emb_dim)
         h_non_static = self.dropout_0(h_non_static)

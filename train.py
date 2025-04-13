@@ -7,6 +7,8 @@ import yaml
 
 from build_problem import BuildProblem
 from my_functions import out_size
+import warnings
+warnings.filterwarnings("ignore")
 torch.cuda.empty_cache()
 torch.backends.cudnn.benchmark = False
 
@@ -133,6 +135,9 @@ def main():
 
     # Run Training
     is_ps or trainer.run()
+
+    trainer.explainability_data()
+    trainer.run_explainability()
 
     # For Optuna
     if is_ps:

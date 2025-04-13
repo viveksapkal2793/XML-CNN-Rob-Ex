@@ -6,6 +6,8 @@ from torch import nn as nn
 
 from my_functions import precision_k, print_num_on_tqdm, tqdm_with_num, print_multiple_metrics
 from adversarial_defense import FGSM
+import warnings
+warnings.filterwarnings("ignore")
 
 def training(params, model, train_loader, optimizer, epoch=1, logger=None):
     device = params["device"]
@@ -79,7 +81,7 @@ def adversarial_training(params, model, train_loader, optimizer, epoch=1, logger
             clean_loss = loss_func(outputs, target)
             
             # Backward pass to get gradients
-            clean_loss.backward()
+            # clean_loss.backward()
             
             # Store clean loss
             clean_losses.append(clean_loss.item())
@@ -89,7 +91,7 @@ def adversarial_training(params, model, train_loader, optimizer, epoch=1, logger
             perturbed_embeddings = fgsm.generate(data, target, loss_func)
             
             # Forward pass with adversarial examples
-            optimizer.zero_grad()
+            # optimizer.zero_grad()
             
             # We need to manually run the forward pass since we're using embeddings directly
             h_non_static = perturbed_embeddings.unsqueeze(1)  # Add channel dimension
@@ -119,18 +121,23 @@ def adversarial_training(params, model, train_loader, optimizer, epoch=1, logger
             adv_loss = loss_func(adv_outputs, target)
             
             # Backward pass and optimize
-            adv_loss.backward()
-            optimizer.step()
+            # adv_loss.backward()
+            # optimizer.step()
             
             # Store adversarial loss
             adv_losses.append(adv_loss.item())
             
             # Total loss for logging
-            total_loss = clean_loss.item() + adv_loss.item()
+            # total_loss = clean_loss.item() + adv_loss.item()
+
+            # Weighted total loss for training
+            total_loss = 0.7*clean_loss + 0.3*adv_loss
+            total_loss.backward()
+            optimizer.step()
             
             # Log batch losses if logger is available
             if logger is not None:
-                logger.log_train_loss(epoch, idx, total_loss, 
+                logger.log_train_loss(epoch, idx, total_loss.item(), 
                                      {"clean_loss": clean_loss.item(), "adv_loss": adv_loss.item()})
 
             if idx < batch_total - 1:
@@ -254,6 +261,34 @@ def validating_testing(params, model, data_loader, epoch=1, is_valid=True, logge
     return eval_epoch
 
 
+
+def explainability_data_extract(params, model, data_loader):
+    # print(params)
+    device = params["device"]
+    model = model.to("cpu")
+    model.eval()
+
+    all_ids = []
+    all_probs = []
+
+    batch_total = params["test_batch_total"]
+
+    with tqdm_with_num(data_loader, batch_total) as loader:
+        loader.set_description("Explainiability data extraction")
+
+        with torch.no_grad():
+            for idx, batch in enumerate(loader):
+                inputs = batch.text.to("cpu")
+                ids = batch.id  
+
+                outputs = model(inputs)
+                probs = torch.sigmoid(outputs).detach().cpu().numpy()
+
+                all_ids.extend(ids)
+                all_probs.extend(probs)
+
+    return list(zip(all_ids, all_probs)) 
+
 def adversarial_validating_testing(params, model, data_loader, epoch=1, is_valid=True, logger=None):
     device = params["device"]
     measure = params["measure"]
@@ -262,7 +297,8 @@ def adversarial_validating_testing(params, model, data_loader, epoch=1, is_valid
     
     # Initialize FGSM attack
     fgsm = FGSM(model, epsilon=params.get("fgsm_epsilon", 0.1))
-
+    # Ensure model is on the correct device
+    model = model.to(device)
     model.eval()
 
     # Metrics for clean examples
@@ -287,12 +323,14 @@ def adversarial_validating_testing(params, model, data_loader, epoch=1, is_valid
         with torch.no_grad():
             # Batch Loop
             for idx, batch in enumerate(loader):
-                data, target = (batch.text.to(device), batch.label.to("cpu"))
-                target_np = target.detach().numpy().copy()
+                data, target = (batch.text.to(device), batch.label.to(device))
+                # target_np = target.detach().numpy().copy()
+                target_np = target.detach().cpu().numpy().copy()
 
                 outputs = model(data)
                 outputs = torch.sigmoid(outputs)
-                outputs_np = outputs.to("cpu").detach().numpy().copy()
+                # outputs_np = outputs.to("cpu").detach().numpy().copy()
+                outputs_np = outputs.detach().cpu().numpy().copy()
                 
                 if "f1" in measure:
                     outputs_np = outputs_np >= 0.5
@@ -375,7 +413,8 @@ def adversarial_validating_testing(params, model, data_loader, epoch=1, is_valid
                 if hasattr(model, 'feature_squeezing'):
                     outputs = model.feature_squeezing.squeeze(outputs)
                 
-                outputs_np = outputs.to("cpu").detach().numpy().copy()
+                # outputs_np = outputs.to("cpu").detach().numpy().copy()
+                outputs_np = outputs.detach().cpu().numpy().copy()
             
             if "f1" in measure:
                 outputs_np = outputs_np >= 0.5
