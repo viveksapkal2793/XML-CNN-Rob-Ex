@@ -1,5 +1,3 @@
-# RCV1 Downloader with modularity for resuming processing steps
-
 import os
 import subprocess
 import argparse
@@ -8,7 +6,6 @@ from tqdm import tqdm
 import gzip
 import shutil
 
-# Global variables
 label_dict = {}
 url = "http://www.ai.mit.edu/projects/jmlr/papers/volume5/lewis04a/a12-token-files/"
 label_url = "http://www.ai.mit.edu/projects/jmlr/papers/volume5/lewis04a/a08-topic-qrels/"
@@ -123,7 +120,6 @@ def process_document_file(filename, label_dict):
                 else:
                     buf.append(i)
             else:
-                # Process the last document
                 labels = get_labels(doc_id[-1], label_dict)
                 text = " ".join(buf).replace("\n", "").replace(".W", "") + "\n"
                 
@@ -154,14 +150,12 @@ def process_label_file(label_file):
             for line in tqdm(f, total=2606875, desc="Processing labels"):
                 parts = line.strip().split()
                 if len(parts) >= 3:
-                    category = parts[0]  # First column is the category
-                    doc_id = parts[1]    # Second column is the document ID
+                    category = parts[0]  
+                    doc_id = parts[1]    
                     
-                    # Initialize empty list for this document if not already present
                     if doc_id not in label_dict:
                         label_dict[doc_id] = []
                     
-                    # Add this category to the document's list of categories
                     label_dict[doc_id].append(category)
         
         os.remove(label_file)
@@ -174,19 +168,17 @@ def process_label_file(label_file):
 def combine_files(output_files):
     """Combine processed files into train and test files"""
     try:
-        # Move first file to train_org.txt
         if os.path.exists(output_files[0]):
-            if os.name == 'nt':  # Windows
+            if os.name == 'nt': 
                 shutil.copy(output_files[0], "train_org.txt")
                 os.remove(output_files[0])
-            else:  # Unix-like
+            else: 
                 subprocess.run(["mv", output_files[0], "train_org.txt"], stdout=subprocess.PIPE)
         else:
             print(f"Warning: {output_files[0]} not found, cannot create train_org.txt")
             return False
         
-        # Combine remaining files into test.txt
-        if os.name == 'nt':  # Windows
+        if os.name == 'nt':  
             with open("test.txt", 'w') as outfile:
                 for fname in output_files[1:]:
                     if os.path.exists(fname):
@@ -195,7 +187,7 @@ def combine_files(output_files):
                         os.remove(fname)
                     else:
                         print(f"Warning: {fname} not found, continuing...")
-        else:  # Unix-like
+        else:  
             cmd = ["cat " + " ".join([f for f in output_files[1:] if os.path.exists(f)]) + " > test.txt"]
             subprocess.run(cmd, stdout=subprocess.PIPE, shell=True)
             [os.remove(f) for f in output_files[1:] if os.path.exists(f)]
@@ -206,7 +198,6 @@ def combine_files(output_files):
         return False
 
 def main():
-    # Parse command line arguments
     parser = argparse.ArgumentParser(description='Download and process RCV1 dataset with resumable steps')
     parser.add_argument('--skip-download', action='store_true', help='Skip downloading files if they exist')
     parser.add_argument('--skip-extraction', action='store_true', help='Skip extracting gz files')
@@ -219,10 +210,8 @@ def main():
     print("RCV1 Downloader with resumable steps")
     print("This program downloads files from '" + url[:-1] + "'.")
     
-    # Process labels first if requested (this is the correct order for document labeling)
     if args.process_labels_first and not args.skip_label_processing:
         print("\n--- Processing Labels ---")
-        # Download and process labels
         if not args.start_from_processing:
             if download_file(label_url, label_file, 7272130, args.skip_download):
                 if not args.skip_extraction:
@@ -233,31 +222,25 @@ def main():
         else:
             print("Warning: Label file not found, continuing without labels")
     
-    # Process documents
     print("\n--- Processing Documents ---")
     output_files = []
     
     for filename, filesize in files:
-        # Download step
         if not args.start_from_processing:
             if not download_file(url, filename, filesize, args.skip_download):
                 print(f"Skipping {filename} due to download failure")
                 continue
             
-            # Extract step
             if not args.skip_extraction:
                 if not extract_file(filename):
                     print(f"Skipping {filename} due to extraction failure")
                     continue
         
-        # Process document step
         if process_document_file(filename, label_dict):
             output_files.append(filename + ".out")
     
-    # Process labels afterwards if not done first
     if not args.process_labels_first and not args.skip_label_processing:
         print("\n--- Processing Labels ---")
-        # Download and process labels
         if not args.start_from_processing:
             if download_file(label_url, label_file, 7272130, args.skip_download):
                 if not args.skip_extraction:
@@ -268,7 +251,6 @@ def main():
         else:
             print("Warning: Label file not found, continuing without labels")
     
-    # Combine output files
     print("\n--- Combining Files ---")
     combine_files([f for f in output_files if os.path.exists(f)])
     

@@ -17,11 +17,9 @@ def convert_eurlex_to_text_format(input_file, output_file, feature_dim=5000, seq
     
     with open(input_file, 'r') as f_in, open(output_file, 'w') as f_out:
 
-        # Skip the first line with metadata
         first_line = f_in.readline().strip()
         print(f"Skipping metadata line: {first_line}")
         
-        # Counter for document IDs
         doc_counter = 0
         
         for line in tqdm(f_in):
@@ -29,35 +27,26 @@ def convert_eurlex_to_text_format(input_file, output_file, feature_dim=5000, seq
             if len(parts) != 2:
                 continue
             
-            # Generate document ID    
             doc_id = f"{doc_counter}"
             doc_counter += 1
             
-            # Get labels and convert from comma-separated to space-separated
             labels_comma, features_str = parts
             labels_space = ' '.join(labels_comma.split(','))
             
-            # Parse features (sparse format)
             features = {}
             for feature in features_str.split():
                 idx, val = feature.split(':')
                 features[int(idx)] = float(val)
             
-            # Sort features by value (highest first) and take top sequence_length
             sorted_features = sorted(features.items(), key=lambda x: x[1], reverse=True)
             top_features = sorted_features[:sequence_length]
             
-            # Create a sequence of feature IDs as tokens
-            # We prefix with "f" to make it clear these are feature IDs
             token_seq = " ".join([f"f{idx}" for idx, _ in top_features])
             
-            # If we have fewer than sequence_length features, pad with a special token
             if len(top_features) < sequence_length:
                 padding = " pad" * (sequence_length - len(top_features))
                 token_seq += padding
             
-            # Write in the format expected by XML-CNN: ID\tLABELS\tTEXT
-            # Format: doc_id\tlabels\tfeatures
             f_out.write(f"{doc_id}\t{labels_space}\t{token_seq}\n")
     
     print(f"Conversion complete. Output saved to {output_file}")

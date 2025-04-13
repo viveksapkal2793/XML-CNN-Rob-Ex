@@ -5,7 +5,6 @@ import torch
 from torch import optim
 from torch.optim.lr_scheduler import MultiStepLR
 from custom_data import XMLCNNDataset, Iterator
-# from torchtext import data
 import matplotlib.pyplot as plt
 from utils import training, validating_testing, adversarial_training, adversarial_validating_testing,explainability_data_extract
 from my_functions import out_size, MetricsLogger
@@ -20,7 +19,6 @@ from transformers import AutoTokenizer
 import warnings
 warnings.filterwarnings("ignore")
 
-# Hyper Params used in Params Search
 def get_hyper_params(trial, length):
     suggest_int = trial.suggest_int
     suggest_uni = trial.suggest_uniform
@@ -81,7 +79,6 @@ def early_stopping(num_of_unchanged, trigger):
     return False
 
 
-# Convert labels to vectors
 class MakeLabelVector:
     def __init__(self):
         self.uniq_of_cat = []
@@ -117,62 +114,12 @@ class BuildProblem:
     def preprocess(self):
         print("\nLoading data...  ", end="", flush=True)
 
-        # ------------torchtext implementation (compatibility issues)------------
-        # process = MakeLabelVector()
-        # set_label_vector = process.set_label_vector
-        # get_label_vector = process.get_label_vector
-
-        # # Define fields for torchtext
-        # length = self.params["sequence_length"]
-        # self.ID = data.RawField(is_target=False)
-        # self.LABEL = data.RawField(set_label_vector, get_label_vector, True)
-        # self.TEXT = data.Field(sequential=True, lower=True, fix_length=length)
-
-        # fields = [
-        #     ("id", self.ID),
-        #     ("label", self.LABEL),
-        #     ("text", self.TEXT),
-        # ]
-
-        # datasets = data.TabularDataset.splits(
-        #     path="./",
-        #     train=self.params["train_data_path"],
-        #     validation=self.params["valid_data_path"],
-        #     test=self.params["test_data_path"],
-        #     format="tsv",
-        #     fields=fields,
-        # )
-
-        # if self.params["params_search"]:
-        #     self.train, self.valid = datasets
-        # else:
-        #     self.train, self.valid, self.test = datasets
-
-        # print("Done.", flush=True)
-
-        # # Convert words to ID
-        # print("Converting text to ID...  ", end="", flush=True)
-        # if self.params["params_search"]:
-        #     self.TEXT.build_vocab(self.train, self.valid)
-        # else:
-        #     self.TEXT.build_vocab(self.train, self.valid, self.test)
-
-        # self.TEXT.vocab.load_vectors("glove.6B.300d")
-        # print("Done.\n", flush=True)
-
-        # # Add parameters that havn't yet been defined
-        # self.params["uniq_of_cat"] = process.uniq_of_cat
-        # self.params["num_of_class"] = len(process.uniq_of_cat)
-
         ## -----------------custom dataloader implementaion ------------
-
-        # Load datasets
         self.train_dataset = XMLCNNDataset(
             self.params["train_data_path"],
             max_length=self.params["sequence_length"]
         )
         
-        # Now load validation and test with the same label structure
         valid_dataset = XMLCNNDataset(
             self.params["valid_data_path"],
             vocab=self.train_dataset.vocab,
@@ -192,19 +139,16 @@ class BuildProblem:
                 label_to_idx=self.train_dataset.label_to_idx
             )
         
-        # Store datasets
         self.train = self.train_dataset
         self.valid = valid_dataset
         if not self.params["params_search"]:
             self.test = test_dataset
         
-        # Load GloVe vectors
         # embeddings = train_dataset.load_vectors('.vector_cache/glove.6B.300d.txt')
         
         vector_path = self.params.get("vector_cache", ".vector_cache/glove.6B.300d.txt")
         embeddings = self.train_dataset.load_vectors(vector_path)
 
-        # Store vocabulary and embeddings in TEXT attribute
         class DummyText:
             def __init__(self):
                 self.vocab = DummyVocab()
@@ -215,7 +159,6 @@ class BuildProblem:
                 
         self.TEXT = DummyText()
         
-        # Store label information
         self.params["uniq_of_cat"] = self.train_dataset.label_list
         self.params["num_of_class"] = len(self.train_dataset.label_list)
         
@@ -227,7 +170,6 @@ class BuildProblem:
         term_size = shutil.get_terminal_size().columns
         use_adversarial = params.get("use_adversarial_training", False)
 
-        # Check for only_test mode
         only_test = params.get("only_test", False)
         only_train = params.get("only_train", False)
 
@@ -239,16 +181,13 @@ class BuildProblem:
 
         save_best_model_path = params["model_cache_path"] + f"best_model_{model_name}.pkl"
         
-        # If we're in test-only mode and not doing parameter search
         if only_test and not only_train and not is_ps:
-            # Define model path
             model_name = params.get("model_name", "xml_cnn")
             if model_name is None:
                 model_name = "xml_cnn"
             # if use_adversarial:
             #     model_name += "_adv"
                 
-            # Initialize data loaders first
             test_loader = Iterator(
                 self.test,
                 batch_size=params["batch_size"],
@@ -260,7 +199,6 @@ class BuildProblem:
                 len(self.test) / params["batch_size"]
             )
             
-            # Initialize logger if logging is enabled
             logger = None
             if params.get("enable_logging", False):
                 log_dir = params.get("log_dir", "logs")
@@ -271,12 +209,10 @@ class BuildProblem:
             print(save_best_model_path)
             print("\n" + " Test Only Mode " .center(term_size, "="))
             
-            # Load the model
             if os.path.exists(save_best_model_path):
                 model = torch.load(save_best_model_path)
-                model = model.to(params["device"])  # Explicitly move model to correct device
-                
-                # Use adversarial testing if enabled
+                model = model.to(params["device"]) 
+
                 if params.get("evaluate_adversarial", False) and use_adversarial:
                     test_measure = adversarial_validating_testing(
                         params, model, test_loader, 0, is_valid=False, logger=logger
@@ -289,23 +225,17 @@ class BuildProblem:
                 out_str = " Finished Testing "
                 print("\n\n" + out_str.center(term_size, "=") + "\n")
                 
-                # Return a dummy value since we're not doing parameter search
                 return 0
             else:
                 print(f"\nError: Model file {save_best_model_path} not found!")
                 return 0
         
-        # Initialize FGSM attack
-        # fgsm = FGSM(self.model, epsilon=0.1)  # You can make epsilon a parameter
-
-        # Initialize logger if logging is enabled
         logger = None
         if params.get("enable_logging", False) and not is_ps:
             log_dir = params.get("log_dir", "logs")
             model_name = params.get("model_name", None)
             logger = MetricsLogger(log_dir, model_name)
 
-        # Show Hyper Params
         if trial is not None:
             sequence_length = params["sequence_length"]
             hyper_params = get_hyper_params(trial, sequence_length)
@@ -316,31 +246,6 @@ class BuildProblem:
             print("\n" + " Current Hyper Params ".center(term_size, "-"))
             print([i for i in sorted(hyper_params.items())])
             print("-" * shutil.get_terminal_size().columns + "\n")
-
-        # Generate Batch Iterators (torchtext iterator)
-        # train_loader = data.Iterator(
-        #     self.train,
-        #     batch_size=params["batch_size"],
-        #     device=params["device"],
-        #     train=True,
-        # )
-
-        # valid_loader = data.Iterator(
-        #     self.valid,
-        #     batch_size=params["batch_size"],
-            # device=params["device"],
-        #     train=False,
-        #     sort=False,
-        # )
-
-        # if not is_ps:
-        #     test_loader = data.Iterator(
-        #         self.test,
-        #         batch_size=params["batch_size"],
-        #         device=params["device"],
-        #         train=False,
-        #         sort=False,
-        #     )
 
         # Generate Batch Iterators (custom iterator)
         train_loader = Iterator(
@@ -365,7 +270,6 @@ class BuildProblem:
                 train=False
             )
 
-        # Calc Batch Size
         params["train_batch_total"] = math.ceil(
             len(self.train) / params["batch_size"]
         )
@@ -379,13 +283,11 @@ class BuildProblem:
                 len(self.test) / params["batch_size"]
             )
 
-        # Define xml-cnn model
         model = xml_cnn(params, self.TEXT.vocab.vectors)
         model = model.to(params["device"])
         epochs = params["epochs"]
         learning_rate = params["learning_rate"]
 
-        # Define Optimizer
         optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
         if not is_ps:
@@ -414,18 +316,13 @@ class BuildProblem:
                 lr = scheduler.get_last_lr()[0]
                 term_size = shutil.get_terminal_size().columns
                 out_str = " Epoch: {} (lr={:.20f}) ".format(epoch, lr)
-            # out_str = " Epoch: {} ".format(epoch)
             print(out_str.center(term_size, "-"))
-
             
-            # Use adversarial training if enabled
             if use_adversarial:
                 adversarial_training(params, model, train_loader, optimizer, epoch, logger)
             else:
                 training(params, model, train_loader, optimizer, epoch, logger)
 
-           
-            # Validation
             if params.get("evaluate_adversarial", False) and use_adversarial:
                 val_measure_epoch_i = adversarial_validating_testing(params, model, valid_loader, epoch, True, logger)
             else:
@@ -435,7 +332,6 @@ class BuildProblem:
             if epoch < 2:
                 best_val_measure = val_measure_epoch_i
                 (not is_ps) and torch.save(model, save_best_model_path)
-                # Log best metrics
                 if logger is not None:
                     if "f1" in measure:
                         logger.log_best_metrics(epoch, {measure: best_val_measure})
@@ -457,16 +353,12 @@ class BuildProblem:
                     if "f1" in measure:
                         logger.log_best_metrics(epoch, {measure: best_val_measure})
                     else:
-                        # For precision metrics - use the metrics we already have
-                        # The p@1, p@3, p@5 values are already computed in validating_testing
-                        # and logged there, so here we just log the best measure
                         logger.log_best_metrics(epoch, {
-                            measure: best_val_measure  # Just log the primary metric
+                            measure: best_val_measure  
                         })
             else:
                 num_of_unchanged += 1
 
-            # Show Best Epoch
             out_str = " Best Epoch: {} (" + measure + ": {:.10f}, "
             out_str = out_str.format(best_epoch, best_val_measure)
             if bool(params["early_stopping"]):
@@ -477,14 +369,12 @@ class BuildProblem:
                 out_str += "ES: False) "
             print("\n" + out_str.center(term_size, "-") + "\n")
 
-            # Early Stopping
             if early_stopping(num_of_unchanged, params["early_stopping"]):
                 break
 
             (not is_ps) and scheduler.step()
 
         if is_ps:
-            # Show Best Trials
             if self.best_trial_measure < best_val_measure:
                 self.best_trial_measure = best_val_measure
                 self.num_of_trial = trial.number + 1
@@ -492,17 +382,12 @@ class BuildProblem:
             out_str = out_str.format(self.num_of_trial, self.best_trial_measure)
             print(out_str.center(term_size, "="))
         else:
-            # Only proceed with testing if we're not in "only_train" mode
-            # or if both flags are set (which means do everything)
             only_train = params.get("only_train", False)
             only_test = params.get("only_test", False)
 
-            # Testing on Best Epoch Model
             if not only_train or only_test:
-                # Testing on Best Epoch Model
                 model = torch.load(save_best_model_path)
                 
-                # Use adversarial testing if enabled, just like in validation
                 if params.get("evaluate_adversarial", False) and use_adversarial:
                     test_measure = adversarial_validating_testing(
                         params, model, test_loader, best_epoch, is_valid=False, logger=logger
@@ -604,10 +489,8 @@ class BuildProblem:
         return torch.tensor(encoded, dtype=torch.long)
 
     def model_predict_fn(self, text_list, model, vocab, max_length):
-        # Ensure model is on CPU
         model = model.cpu()
         
-        # Process in smaller batches to avoid memory issues
         batch_size = 8
         all_probs = []
         
@@ -723,18 +606,15 @@ class BuildProblem:
 
         class_names = self.train_dataset.label_list
 
-        # Create directory for LIME results if it doesn't exist
         os.makedirs("lime_results", exist_ok=True)
 
         max_examples = 3
         for i, (text, prob) in enumerate(lime_ready_data[:max_examples]):
             print(f"Running LIME for example #{i}...")
             try:
-                # Set smaller number of features and samples to reduce memory usage
                 lime_expl = self.run_lime_on_example(text, model_predict_fn_wrapper, class_names, 
                                                 num_features=5, idx=i)
                 
-                # Get predictions for this example
                 labels = np.where(model_predict_fn_wrapper([text])[0] > 0.5)[0].tolist()
                 for label in labels:
                     lime_weights = lime_expl.as_list(label=label)

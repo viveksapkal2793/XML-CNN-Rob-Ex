@@ -12,7 +12,6 @@ warnings.filterwarnings("ignore")
 torch.cuda.empty_cache()
 torch.backends.cudnn.benchmark = False
 
-# Convert params from Optuna
 def convert_params(params, length):
     params["hidden_dims"] = 2 ** params["hidden_dims"]
     params["filter_channels"] = 2 ** params["filter_channels"]
@@ -43,7 +42,6 @@ def convert_params(params, length):
 
 
 def main():
-    # Config of Args
     parser = ArgumentParser()
     message = "Enable params search."
     action = "store_true"
@@ -66,11 +64,9 @@ def main():
     use_device = use_cpu and torch.device("cpu") or use_device
     term_size = shutil.get_terminal_size().columns
 
-    # Show learning mode
     out_str = is_ps and " Params Search Mode " or " Normal Train Mode "
     print(out_str.center(term_size, "="))
 
-    # Load Params
     with open("params.yml") as f:
         params = yaml.safe_load(f)
 
@@ -105,12 +101,10 @@ def main():
         normal_train["test_data_path"] = "eurlex_data/test.txt"
         normal_train["valid_data_path"] = "eurlex_data/valid.txt"
         
-    # Show Common Params
     print("\n" + " Params ".center(term_size, "-"))
     print([i for i in sorted(common.items())])
     print("-" * shutil.get_terminal_size().columns)
 
-    # Set of automatically determined params
     params = {"device": use_device, "params_search": is_ps}
 
     common["model_cache_path"] += common["model_cache_path"][-1] == "/" and "" or "/"
@@ -129,23 +123,18 @@ def main():
         params.update(hyper_params)
         params.update(normal_train)
 
-    # Build Problem
     trainer = BuildProblem(params)
     trainer.preprocess()
 
-    # Run Training
     is_ps or trainer.run()
 
     trainer.explainability_data()
     trainer.run_explainability()
 
-    # For Optuna
     if is_ps:
-        # Config of Optuna
         optuna.logging.disable_default_handler()
         study = optuna.create_study()
 
-        # Params Search
         study.optimize(trainer.run, n_trials=params["trials"])
 
         trial = study.best_trial

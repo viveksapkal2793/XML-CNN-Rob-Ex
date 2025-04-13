@@ -12,7 +12,6 @@ class XMLCNNDataset(Dataset):
         self.label_set = set()
         
         print(f"Loading data from {file_path}...")
-        # Read data
         with open(file_path, 'r') as f:
             for line in f:
                 parts = line.strip().split('\t')
@@ -23,7 +22,6 @@ class XMLCNNDataset(Dataset):
                     self.texts.append(text.split())
                     self.label_set.update(label_str.split())
         
-        # Create label mapping - use provided label list if given
         if label_list is not None:
             self.label_list = label_list
             self.label_to_idx = label_to_idx
@@ -31,7 +29,6 @@ class XMLCNNDataset(Dataset):
             self.label_list = sorted(list(self.label_set))
             self.label_to_idx = {label: i for i, label in enumerate(self.label_list)}
         
-        # Build vocabulary
         if build_vocab:
             if vocab is None:
                 self.vocab = {'<pad>': 0, '<unk>': 1}
@@ -48,20 +45,17 @@ class XMLCNNDataset(Dataset):
         return len(self.ids)
     
     def __getitem__(self, idx):
-        # Convert text to indices
         text = self.texts[idx]
         indices = [self.vocab.get(token, self.vocab['<unk>']) for token in text]
         
-        # Pad or truncate to max_length
         if len(indices) < self.max_length:
             indices = indices + [self.vocab['<pad>']] * (self.max_length - len(indices))
         else:
             indices = indices[:self.max_length]
         
-        # Convert labels to one-hot vector
         label_indices = []
         for label in self.labels[idx]:
-            if label in self.label_to_idx:  # Only use labels that are in our mapping
+            if label in self.label_to_idx:  
                 label_indices.append(self.label_to_idx[label])
         
         label_vector = np.zeros(len(self.label_list))
@@ -77,7 +71,6 @@ class XMLCNNDataset(Dataset):
         """Load pre-trained word vectors - supports both GloVe and BOW embeddings"""
         print(f"Loading word vectors from {vector_file}...")
         
-        # Auto-detect if we're using BOW features
         is_bow = 'bow_embeddings.txt' in vector_file
         
         vectors = {}
@@ -88,15 +81,12 @@ class XMLCNNDataset(Dataset):
                 vector = np.array(values[1:], dtype='float32')
                 vectors[word] = vector
         
-        # Initialize embedding matrix
         embedding_matrix = np.random.uniform(-0.25, 0.25, (len(self.vocab), dim))
-        embedding_matrix[0] = 0  # <pad> embedding
+        embedding_matrix[0] = 0  
         
-        # Copy pre-trained embeddings
         for word, idx in self.vocab.items():
             if word in vectors:
                 embedding_matrix[idx] = vectors[word]
-            # Special handling for feature tokens in BOW mode
             elif is_bow and word.startswith('f') and word[1:].isdigit():
                 feature_id = int(word[1:])
                 feature_token = f"f{feature_id}"

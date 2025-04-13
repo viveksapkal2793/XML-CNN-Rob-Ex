@@ -19,7 +19,6 @@ class xml_cnn(nn.Module):
         d_max_pool_p = params["d_max_pool_p"]
         self.filter_sizes = params["filter_sizes"]
 
-        # Initialize feature squeezing for inference
         self.feature_squeezing = FeatureSqueezing(bit_depth=params.get("bit_depth", 8))
 
         self.lookup = nn.Embedding.from_pretrained(embedding_weights, freeze=False)
@@ -35,10 +34,8 @@ class xml_cnn(nn.Module):
             conv_n = nn.Conv2d(
                 1, filter_channels, (fsz, emb_dim), stride=(ssz, emb_dim)
             )
-            # Initialize with He's method
             torch.nn.init.kaiming_normal_(conv_n.weight)
 
-            # Dynamic Max-Pooling
             conv_out_size = out_size(sequence_length, fsz, filter_channels, stride=ssz)
             assert conv_out_size % n == 0
             pool_k_size = conv_out_size // n
@@ -49,24 +46,20 @@ class xml_cnn(nn.Module):
             self.conv_layers.append(conv_n)
             self.pool_layers.append(pool_n)
         
-        # Create linear layers after calculating correct dimensions
         self.l1 = nn.Linear(self.fin_l_out_size, hidden_dims)
         self.l2 = nn.Linear(hidden_dims, params["num_of_class"])
 
-        # Initialize with He's method
         torch.nn.init.kaiming_normal_(self.l1.weight)
         torch.nn.init.kaiming_normal_(self.l2.weight)
 
     def forward(self, x, apply_squeezing=False):
-        # Embedding layer
         x = x.to(self.lookup.weight.device) 
-        h_non_static = self.lookup.forward(x)  # Remove permute to handle batch correctly
-        h_non_static = h_non_static.unsqueeze(1)  # Add channel dimension (batch, 1, seq_len, emb_dim)
+        h_non_static = self.lookup.forward(x) 
+        h_non_static = h_non_static.unsqueeze(1)  
         h_non_static = self.dropout_0(h_non_static)
 
         h_list = []
 
-        # Conv, Pooling layers
         for i in range(len(self.filter_sizes)):
             h_n = self.conv_layers[i](h_non_static)
             h_n = h_n.view(h_n.shape[0], 1, h_n.shape[1] * h_n.shape[2])
@@ -80,16 +73,12 @@ class xml_cnn(nn.Module):
         else:
             h = h_list[0]
         
-        # Ensure dimensions match what's expected
         assert h.shape[1] == self.fin_l_out_size, f"Expected features: {self.fin_l_out_size}, got: {h.shape[1]}"
         
-        # Full connected layer
         h = F.relu(self.l1(h))
         h = self.dropout_1(h)
         
-        # Output layer
         y = self.l2(h)
-        # Apply feature squeezing at inference time if requested
         if apply_squeezing:
             y = self.feature_squeezing.squeeze(y)
 

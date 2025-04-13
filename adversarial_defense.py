@@ -23,22 +23,17 @@ class FGSM:
         Returns:
             Perturbed embeddings
         """
-        # Set model to eval mode temporarily to generate adversarial examples
         training_mode = self.model.training
         self.model.eval()
         
-        # Get the word embeddings
         emb = self.model.lookup(x)
-        # Calculate average embedding norm for this batch
         avg_norm = torch.mean(torch.norm(emb, dim=-1))
-        adaptive_epsilon = self.epsilon * (avg_norm / 10.0)  # Scale epsilon by norm
+        adaptive_epsilon = self.epsilon * (avg_norm / 10.0) 
 
         emb_adv = emb.clone().detach().requires_grad_(True)
         
-        # Forward pass on embeddings directly
-        h_non_static = emb_adv.unsqueeze(1)  # Add channel dimension
+        h_non_static = emb_adv.unsqueeze(1) 
         
-        # Process through the model layers manually
         h_list = []
         for i in range(len(self.model.filter_sizes)):
             h_n = self.model.conv_layers[i](h_non_static)
@@ -57,20 +52,15 @@ class FGSM:
         outputs = self.model.l2(h)
         outputs = torch.sigmoid(outputs)
         
-        # Use BCE loss if no loss function is provided
         if loss_fn is None:
             loss_fn = torch.nn.BCELoss()
         
-        # Calculate loss
         loss = loss_fn(outputs, target)
         
-        # Backward pass to get gradients on embeddings
         loss.backward()
         
-        # Create adversarial examples using the sign of gradients
         perturbed_embeddings = emb + adaptive_epsilon * emb_adv.grad.sign()
         
-        # Restore model's training mode
         if training_mode:
             self.model.train()
         

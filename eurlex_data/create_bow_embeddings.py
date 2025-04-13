@@ -13,24 +13,17 @@ def create_bow_embeddings(feature_dim=5000, embedding_dim=300):
     """
     print(f"Creating BOW embeddings with {feature_dim} features and {embedding_dim} dimensions...")
     
-    # Create output directory if needed
     os.makedirs(".vector_cache", exist_ok=True)
     
-    # Initialize with small random values
     embeddings = np.random.uniform(-0.25, 0.25, (feature_dim + 2, embedding_dim))
     
-    # Special tokens: 0=pad, 1=unknown
-    embeddings[0] = 0  # Padding token
+    embeddings[0] = 0  
     
-    # Create embeddings file in GloVe format
     with open(".vector_cache/bow_embeddings.txt", "w") as f:
-        # Write special tokens
         f.write(f"pad {' '.join(['0.0'] * embedding_dim)}\n")
         f.write(f"unk {' '.join([str(x) for x in embeddings[1]])}\n")
         
-        # Write feature embeddings
         for i in range(feature_dim):
-            # Create token name as "f{feature_id}"
             token = f"f{i}"
             vector = ' '.join([str(x) for x in embeddings[i + 2]])
             f.write(f"{token} {vector}\n")

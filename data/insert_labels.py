@@ -3,7 +3,6 @@ import os
 import sys
 import shutil
 
-# Dictionary to store labels
 label_dict = {}
 
 def load_labels(label_file):
@@ -34,7 +33,6 @@ def load_labels(label_file):
         
         print(f"Successfully loaded {count} labels for {len(label_dict)} documents")
         
-        # Display a few sample entries
         samples = list(label_dict.items())[:3]
         for doc_id, labels in samples:
             print(f"Sample - Doc ID: {doc_id}, Labels: {labels}")
@@ -58,27 +56,22 @@ def create_labeled_file(input_file, output_file):
             for line in fin:
                 line = line.strip()
                 if not line:
-                    continue  # Skip empty lines
+                    continue  
                     
-                # Split by any amount of whitespace at the beginning
                 parts = line.split(None, 1)
                 if len(parts) >= 1:
                     doc_id = parts[0].strip()
                     
-                    # Get the text part (everything after the ID)
                     text = ""
                     if len(parts) > 1:
                         text = parts[1].strip()
                         
-                    # Get labels for this document
                     labels = label_dict.get(doc_id, [])
                     labels_str = " ".join(labels)
                     
-                    # Write in the correct format: doc_id \t labels \t text
                     fout.write(f"{doc_id}\t{labels_str}\t{text}\n")
                     line_count += 1
                 else:
-                    # Just copy the line if we can't parse it
                     fout.write(line + "\n")
                     print(f"Warning: Could not parse line: {line}")
         
@@ -98,27 +91,21 @@ def main():
     
     args = parser.parse_args()
     
-    # Load the labels
     if not load_labels(args.label_file):
         print("Failed to load labels. Exiting.")
         return 1
         
-    # Process each file
     success = True
     for file_path in args.files:
-        # Create temp output file
         temp_file = file_path + ".new"
         
-        # Process the file
         if create_labeled_file(file_path, temp_file):
             if not args.keep_originals:
-                # Make backup of original
                 backup_file = file_path + ".bak"
                 try:
                     shutil.copy2(file_path, backup_file)
                     print(f"Created backup of {file_path} at {backup_file}")
                     
-                    # Replace original with new file
                     shutil.move(temp_file, file_path)
                     print(f"Replaced {file_path} with labeled version")
                 except Exception as e:

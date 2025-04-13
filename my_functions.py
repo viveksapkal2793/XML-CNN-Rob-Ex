@@ -31,7 +31,6 @@ def print_num_on_tqdm(loader, num, measure=None, last=False):
         loader.set_postfix_str(out_str)
 
 
-# Calculate the size of the Tensor after convolution
 def out_size(l_in, kernel_size, channels, padding=0, dilation=1, stride=1):
     a = l_in + 2 * padding - dilation * (kernel_size - 1) - 1
     b = int(a / stride)
@@ -54,7 +53,6 @@ def print_multiple_metrics(loader, metrics, last=False):
     """Print multiple precision metrics on tqdm progress bar"""
     out_str = last and "Epoch" or "Batch"
     
-    # Format the metrics for display
     metrics_str = f"p@1={metrics['p@1']:.6f}, p@3={metrics['p@3']:.6f}, p@5={metrics['p@5']:.6f}"
     out_str = f" {metrics_str}/{out_str}"
     
@@ -64,10 +62,8 @@ def print_multiple_metrics(loader, metrics, last=False):
 class MetricsLogger:
     """Logger for training and validation metrics"""
     def __init__(self, log_dir="logs", model_name=None):
-        # Create logs directory if it doesn't exist
         os.makedirs(log_dir, exist_ok=True)
         
-        # Generate model name based on timestamp if not provided
         if model_name is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             model_name = f"model_{timestamp}"
@@ -78,7 +74,6 @@ class MetricsLogger:
         self.model_dir = os.path.join(log_dir, model_name)
         os.makedirs(self.model_dir, exist_ok=True)
         
-        # Initialize metrics storage
         self.train_losses = []
         self.valid_metrics = []
         self.test_metrics = []
@@ -89,7 +84,6 @@ class MetricsLogger:
     def log_train_loss(self, epoch, batch=None, loss=None, avg_loss=None, extra_metrics=None):
         """Log training loss (batch or epoch level)"""
         if batch is not None:
-            # Log batch-level loss
             log_entry = {
                 'epoch': epoch,
                 'batch': batch,
@@ -99,7 +93,6 @@ class MetricsLogger:
                 log_entry.update(extra_metrics)
             self.train_losses.append(log_entry)
         else:
-            # Log epoch-level average loss
             log_entry = {
                 'epoch': epoch,
                 'avg_loss': avg_loss
@@ -108,7 +101,6 @@ class MetricsLogger:
                 log_entry.update(extra_metrics)
             self.train_losses.append(log_entry)
         
-        # Save to file periodically
         self._save_train_logs(self.model_name, self.timestamp)
     
     def log_validation_metrics(self, epoch, metrics):
